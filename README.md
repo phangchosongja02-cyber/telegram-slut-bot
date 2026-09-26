@@ -1,8 +1,8 @@
-# Telegram Slut Bot
+# Telegram Slut Bot (OpenRouter Uncensored)
 
-Fully whore AI chatbot for Telegram powered by Gemini.
+Fully whore AI chatbot for Telegram using a free uncensored model on OpenRouter.
 
-## Setup
+## Setup (Termux or any Python environment)
 
 1. Clone the repo
 ```bash
@@ -15,20 +15,26 @@ cd telegram-slut-bot
 pip install -r requirements.txt
 ```
 
-3. Create `.env` from the example
+3. Create `.env`
 ```bash
 cp .env.example .env
 ```
 
-Fill in your Telegram bot token (from @BotFather) and Gemini API key.
+Fill in:
+- TELEGRAM_BOT_TOKEN (from @BotFather)
+- OPENROUTER_API_KEY (from https://openrouter.ai/keys)
 
 4. Run it
 ```bash
 python slut_bot.py
 ```
 
+## Model used
+`cognitivecomputations/dolphin-mistral-24b-venice-edition:free`  
+(Venice Uncensored Dolphin - free & made to ignore safety filters)
+
 ## Commands
 - `/start` - Wake the whore up
 - `/reset` - Wipe her memory
 
-She stays in full slut character the entire time. Use her.
+She stays in full slut character the entire time.
