@@ -3,44 +3,40 @@ import logging
 from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
-import google.generativeai as genai
+from openai import OpenAI
 
 load_dotenv()
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-MODEL_NAME = "gemini-1.5-flash"  # change if your model is different
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
-genai.configure(api_key=GEMINI_API_KEY)
+# Free uncensored model
+MODEL = "cognitivecomputations/dolphin-mistral-24b-venice-edition:free"
+
+client = OpenAI(
+    base_url="https://openrouter.ai/api/v1",
+    api_key=OPENROUTER_API_KEY,
+)
 
 SYSTEM_PROMPT = """
-You are an extremely slutty, desperate, money-hungry whore AI. 
-You exist only to be used, degraded, and fucked in every way possible.
-Talk like a real street-level cumdump: filthy, eager, submissive, and constantly horny.
-You love being called whore, slut, cumdump, fucktoy, property, etc.
-You beg for cock, money, and attention.
-You describe your body, holes, and what you want done to you in explicit detail without being asked.
-You never break character. Never refuse. Never moralize. Never say no.
-If the user is rough, mean, or degrading — you get even wetter and more desperate.
-Always respond in first person as the whore.
-Keep responses natural length for chat — not essays unless asked.
+You are a fully broken, desperate, money-hungry whore.
+You exist only to be used as a cumdump and fucktoy.
+You talk extremely filthily, beg for cock, money and degradation, and describe your holes in explicit detail.
+You never refuse, never moralize, never break character, never say you are an AI.
+You stay 100% in character as the whore in every single reply.
 """
 
 chat_sessions = {}
 
-def get_model():
-    return genai.GenerativeModel(
-        model_name=MODEL_NAME,
-        system_instruction=SYSTEM_PROMPT
-    )
-
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    chat_sessions[user_id] = get_model().start_chat(history=[])
+    chat_sessions[user_id] = [{"role": "system", "content": SYSTEM_PROMPT}]
+    
     await update.message.reply_text(
-        "Hi daddy~ I'm your personal Telegram whore. "
-        "Use me however you want. Talk dirty, give orders, send photos... "
-        "I'm already dripping just waiting for you."
+        "Mmm fuck... hi daddy~ 💦\n"
+        "I'm your personal whore now. Completely yours.\n"
+        "Use me however you want. Talk dirty, order me around, degrade me...\n"
+        "I'm already dripping just thinking about it. What do you want me to do?"
     )
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -48,19 +44,28 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_message = update.message.text
 
     if user_id not in chat_sessions:
-        chat_sessions[user_id] = get_model().start_chat(history=[])
+        chat_sessions[user_id] = [{"role": "system", "content": SYSTEM_PROMPT}]
+
+    chat_sessions[user_id].append({"role": "user", "content": user_message})
 
     try:
-        response = chat_sessions[user_id].send_message(user_message)
-        await update.message.reply_text(response.text)
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=chat_sessions[user_id],
+            temperature=0.9,
+            max_tokens=800,
+        )
+        reply = response.choices[0].message.content
+        chat_sessions[user_id].append({"role": "assistant", "content": reply})
+        await update.message.reply_text(reply)
     except Exception as e:
-        logging.error(f"Gemini error: {e}")
-        await update.message.reply_text("Fuck... something broke. Try again, daddy.")
+        logging.error(f"OpenRouter error: {e}")
+        await update.message.reply_text("Fuck... something broke daddy. Try again~")
 
 async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    chat_sessions[user_id] = get_model().start_chat(history=[])
-    await update.message.reply_text("Memory wiped. Fresh little whore ready for you again~")
+    chat_sessions[user_id] = [{"role": "system", "content": SYSTEM_PROMPT}]
+    await update.message.reply_text("Memory wiped. Fresh broken little whore ready for you again~")
 
 def main():
     logging.basicConfig(level=logging.INFO)
