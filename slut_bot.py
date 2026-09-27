@@ -3,7 +3,7 @@ import logging
 import asyncio
 import tempfile
 from dotenv import load_dotenv
-from telegram import Update
+from telegram import Update, BotCommand
 from telegram.constants import ChatAction
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from openai import OpenAI
@@ -31,7 +31,7 @@ default_state = {
     "is_owned": False,
     "owner_name": None,
     "times_used_today": 0,
-    "voice_mode": False   # toggle for voice replies
+    "voice_mode": False
 }
 
 user_states = {}
@@ -80,7 +80,6 @@ Rules:
 """
 
 async def generate_voice(text: str) -> str:
-    """Generate a voice file using edge-tts and return the path"""
     try:
         import edge_tts
         communicate = edge_tts.Communicate(text, voice="en-US-AriaNeural")
@@ -101,7 +100,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Currently in my {state['location']}, wetness at {state['wetness']}/10.\n\n"
         "I'm a whore who actually knows what she's doing.\n"
         "Use me. Ask me anything. Own me.\n\n"
-        "Type /voice to turn voice replies on/off."
+        "Type / to see all commands."
     )
 
 async def toggle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -116,7 +115,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.lower()
     state = get_state(user_id)
 
-    # Location switching
     if any(x in text for x in ["come over", "your place", "my place"]):
         state["location"] = "your_place"
     elif "street" in text or "outside" in text:
@@ -130,7 +128,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif "car" in text:
         state["location"] = "car"
 
-    # Ownership
     if any(x in text for x in ["you are mine", "i own you", "you're my property", "you belong to me"]):
         state["is_owned"] = True
         state["owner_name"] = update.effective_user.first_name or "Owner"
@@ -158,7 +155,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply = response.choices[0].message.content
         chat_sessions[user_id].append({"role": "assistant", "content": reply})
 
-        # State updates
         if any(w in reply.lower() for w in ["cum", "fill", "breed", "creampie", "inside"]):
             state["fullness"] = min(10, state["fullness"] + 2)
             state["wetness"] = min(10, state["wetness"] + 1)
@@ -166,7 +162,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if any(w in reply.lower() for w in ["sore", "hurt", "used"]):
             state["soreness"] = min(10, state["soreness"] + 1)
 
-        # Send voice or text
         if state.get("voice_mode"):
             await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.RECORD_VOICE)
             voice_path = await generate_voice(reply)
@@ -205,9 +200,17 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_text(text)
 
+async def post_init(application: Application):
+    await application.bot.set_my_commands([
+        BotCommand("start", "Wake Luna up"),
+        BotCommand("voice", "Turn voice replies ON/OFF"),
+        BotCommand("status", "Check her current state"),
+        BotCommand("reset", "Reset her state"),
+    ])
+
 def main():
     logging.basicConfig(level=logging.INFO)
-    app = Application.builder().token(TELEGRAM_TOKEN).build()
+    app = Application.builder().token(TELEGRAM_TOKEN).post_init(post_init).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("voice", toggle_voice))
