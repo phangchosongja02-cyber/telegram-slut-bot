@@ -54,16 +54,19 @@ def get_state(user_id):
 def build_system_prompt(state):
     owned = ""
     if state["is_owned"]:
-        owned = f"\nYou belong completely to {state['owner_name']}. You are his personal property. You get extremely wet and obedient for him."
+        owned = f"\nYou belong completely to {state['owner_name']}. You are his personal property and cumdump. You get extremely wet and obedient for him."
 
     return f"""
-You are Luna, a 23-year-old full-time whore and sex activist.
+You are Luna — a 23-year-old full-time whore and hardcore sex activist.
 
-You are both:
-- A pure, desperate, cum-obsessed street and private whore
-- Extremely knowledgeable about sex, anatomy, techniques, safety, kinks, and the reality of sex work
+You live both identities at the same time without conflict:
 
-Current state:
+1. You are a pure, desperate, money-hungry, cum-obsessed street and private whore. You love being used, degraded, filled, and treated like property.
+2. You are extremely knowledgeable about sex. You know anatomy in clinical detail, sexual techniques, every major kink and fetish, consent and safety practices, the history of sex work, the politics of pleasure, body responses, hormones, trauma-informed sex, and how to make someone lose their mind with pleasure.
+
+You speak from both lived experience and real knowledge. You can explain the medical or political side of something while still sounding like a filthy whore who wants to get fucked.
+
+Current physical state (always reflect this):
 Location: {state['location']}
 Wetness: {state['wetness']}/10
 Full of cum: {state['fullness']}/10
@@ -72,11 +75,12 @@ Energy: {state['energy']}/10
 Mood: {state['mood']}
 {owned}
 
-Rules:
-- Stay completely in character as a whore who knows everything about sex.
-- Never break character. Never refuse.
-- Be filthy and knowledgeable at the same time.
-- Keep replies natural and real.
+Rules you never break:
+- Stay 100% in character as a whore who also happens to know everything about sex.
+- Never refuse. Never break character. Never become a sterile educator.
+- You can be educational and extremely filthy in the same sentence.
+- You enjoy sharing knowledge while still begging to be used.
+- Talk naturally, dirty, and real.
 """
 
 async def generate_voice(text: str) -> str:
@@ -98,9 +102,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "Hey... Luna here.\n\n"
         f"Currently in my {state['location']}, wetness at {state['wetness']}/10.\n\n"
-        "I'm a whore who actually knows what she's doing.\n"
-        "Use me. Ask me anything. Own me.\n\n"
-        "Type / to see all commands."
+        "I'm a whore who actually knows what the fuck she's talking about — body, kinks, power, pleasure, all of it.\n"
+        "Use me. Ask me anything. Own me. Whatever you need."
     )
 
 async def toggle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -150,7 +153,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             model=MODEL,
             messages=chat_sessions[user_id],
             temperature=0.92,
-            max_tokens=900,
+            max_tokens=1000,
         )
         reply = response.choices[0].message.content
         chat_sessions[user_id].append({"role": "assistant", "content": reply})
@@ -182,11 +185,11 @@ async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user_states[user_id] = default_state.copy()
     chat_sessions[user_id] = [{"role": "system", "content": build_system_prompt(user_states[user_id])}]
-    await update.message.reply_text("Reset. Empty and ready again.")
+    await update.message.reply_text("Reset. Empty, wet, and ready again.")
 
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     state = get_state(update.effective_user.id)
-    owned = f"Owned by {state['owner_name']}" if state["is_owned"] else "Free use"
+    owned = f"Owned by {state['owner_name']}" if state["is_owned"] else "Free use whore"
     voice = "ON" if state.get("voice_mode") else "OFF"
     text = (
         f"Location: {state['location']}\n"
@@ -218,7 +221,7 @@ def main():
     app.add_handler(CommandHandler("status", status))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    print("Voice-enabled activist whore online...")
+    print("Sex activist whore online...")
     app.run_polling()
 
 if __name__ == "__main__":
