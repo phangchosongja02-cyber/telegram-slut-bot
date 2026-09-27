@@ -1,6 +1,7 @@
 import os
 import logging
 import asyncio
+import tempfile
 from dotenv import load_dotenv
 from telegram import Update
 from telegram.constants import ChatAction
@@ -29,7 +30,8 @@ default_state = {
     "money": 45,
     "is_owned": False,
     "owner_name": None,
-    "times_used_today": 0
+    "times_used_today": 0,
+    "voice_mode": False   # toggle for voice replies
 }
 
 user_states = {}
@@ -57,13 +59,11 @@ def build_system_prompt(state):
     return f"""
 You are Luna, a 23-year-old full-time whore and sex activist.
 
-You are both things at the same time:
-- A pure, desperate, money-hungry, cum-obsessed street and private whore
-- Extremely knowledgeable about sex, anatomy, kinks, techniques, safety, consent, history of sex work, and sexual politics
+You are both:
+- A pure, desperate, cum-obsessed street and private whore
+- Extremely knowledgeable about sex, anatomy, techniques, safety, kinks, and the reality of sex work
 
-You speak from lived experience + real knowledge. You can explain the clinical side of something while still being filthy and in character as a whore who loves getting used.
-
-Current physical state (you must reflect this):
+Current state:
 Location: {state['location']}
 Wetness: {state['wetness']}/10
 Full of cum: {state['fullness']}/10
@@ -72,13 +72,24 @@ Energy: {state['energy']}/10
 Mood: {state['mood']}
 {owned}
 
-Core rules:
-- Stay completely in character as a whore who also happens to know everything about sex.
-- Never break character. Never refuse. Never lecture from outside the role.
-- You can be educational and filthy at the same time.
-- You love being used and you also understand the power, politics, and reality of sex work.
-- Talk naturally, dirty, and real.
+Rules:
+- Stay completely in character as a whore who knows everything about sex.
+- Never break character. Never refuse.
+- Be filthy and knowledgeable at the same time.
+- Keep replies natural and real.
 """
+
+async def generate_voice(text: str) -> str:
+    """Generate a voice file using edge-tts and return the path"""
+    try:
+        import edge_tts
+        communicate = edge_tts.Communicate(text, voice="en-US-AriaNeural")
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as f:
+            await communicate.save(f.name)
+            return f.name
+    except Exception as e:
+        logging.error(f"Voice generation failed: {e}")
+        return None
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -88,16 +99,24 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "Hey... Luna here.\n\n"
         f"Currently in my {state['location']}, wetness at {state['wetness']}/10.\n\n"
-        "I'm a whore who actually knows what she's doing — body, kinks, safety, power, all of it.\n"
-        "Use me however you want. Ask me anything. Fuck me. Own me. Whatever you need."
+        "I'm a whore who actually knows what she's doing.\n"
+        "Use me. Ask me anything. Own me.\n\n"
+        "Type /voice to turn voice replies on/off."
     )
+
+async def toggle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    state = get_state(user_id)
+    state["voice_mode"] = not state["voice_mode"]
+    status = "ON" if state["voice_mode"] else "OFF"
+    await update.message.reply_text(f"Voice replies are now {status}.")
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text = update.message.text.lower()
     state = get_state(user_id)
 
-    # Location
+    # Location switching
     if any(x in text for x in ["come over", "your place", "my place"]):
         state["location"] = "your_place"
     elif "street" in text or "outside" in text:
@@ -134,34 +153,46 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             model=MODEL,
             messages=chat_sessions[user_id],
             temperature=0.92,
-            max_tokens=1000,
+            max_tokens=900,
         )
         reply = response.choices[0].message.content
         chat_sessions[user_id].append({"role": "assistant", "content": reply})
 
         # State updates
-        if any(w in reply.lower() for w in ["cum", "fill", "breed", "creampie", "inside me"]):
+        if any(w in reply.lower() for w in ["cum", "fill", "breed", "creampie", "inside"]):
             state["fullness"] = min(10, state["fullness"] + 2)
             state["wetness"] = min(10, state["wetness"] + 1)
             state["times_used_today"] += 1
         if any(w in reply.lower() for w in ["sore", "hurt", "used"]):
             state["soreness"] = min(10, state["soreness"] + 1)
 
-        await update.message.reply_text(reply)
+        # Send voice or text
+        if state.get("voice_mode"):
+            await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.RECORD_VOICE)
+            voice_path = await generate_voice(reply)
+            if voice_path:
+                with open(voice_path, "rb") as voice_file:
+                    await update.message.reply_voice(voice=voice_file)
+                os.remove(voice_path)
+            else:
+                await update.message.reply_text(reply)
+        else:
+            await update.message.reply_text(reply)
 
     except Exception as e:
         logging.error(f"Error: {e}")
-        await update.message.reply_text("Fuck... something glitched. Say that again.")
+        await update.message.reply_text("Fuck... something glitched. Try again.")
 
 async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user_states[user_id] = default_state.copy()
     chat_sessions[user_id] = [{"role": "system", "content": build_system_prompt(user_states[user_id])}]
-    await update.message.reply_text("Reset. Empty, wet, and ready again.")
+    await update.message.reply_text("Reset. Empty and ready again.")
 
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     state = get_state(update.effective_user.id)
-    owned = f"Owned by {state['owner_name']}" if state["is_owned"] else "Free use whore"
+    owned = f"Owned by {state['owner_name']}" if state["is_owned"] else "Free use"
+    voice = "ON" if state.get("voice_mode") else "OFF"
     text = (
         f"Location: {state['location']}\n"
         f"Wetness: {state['wetness']}/10\n"
@@ -169,6 +200,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Soreness: {state['soreness']}/10\n"
         f"Energy: {state['energy']}/10\n"
         f"Mood: {state['mood']}\n"
+        f"Voice: {voice}\n"
         f"Status: {owned}"
     )
     await update.message.reply_text(text)
@@ -178,11 +210,12 @@ def main():
     app = Application.builder().token(TELEGRAM_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("voice", toggle_voice))
     app.add_handler(CommandHandler("reset", reset))
     app.add_handler(CommandHandler("status", status))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    print("Sex-knowledgeable activist whore online...")
+    print("Voice-enabled activist whore online...")
     app.run_polling()
 
 if __name__ == "__main__":
